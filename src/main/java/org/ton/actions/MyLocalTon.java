@@ -1,23 +1,40 @@
 package org.ton.actions;
 
-import com.google.gson.GsonBuilder;
-import com.jfoenix.controls.JFXListView;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
-import javafx.util.Duration;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
+import java.awt.GraphicsEnvironment;
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Paths;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
+import static org.apache.commons.lang3.ObjectUtils.isNotEmpty;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -48,6 +65,8 @@ import org.ton.java.tonlib.types.RunResult;
 import org.ton.java.tonlib.types.TvmStackEntryNumber;
 import org.ton.java.utils.Utils;
 import org.ton.main.App;
+import static org.ton.main.App.fxmlLoader;
+import static org.ton.main.App.mainController;
 import org.ton.main.Main;
 import org.ton.parameters.SendToncoinsParam;
 import org.ton.parameters.ValidationParam;
@@ -55,39 +74,29 @@ import org.ton.settings.MyLocalTonSettings;
 import org.ton.settings.Node;
 import org.ton.ui.controllers.MainController;
 import org.ton.ui.custom.events.CustomEvent;
+import static org.ton.ui.custom.events.CustomEventBus.emit;
 import org.ton.ui.custom.events.event.CustomNotificationEvent;
 import org.ton.ui.custom.events.event.CustomSearchEvent;
 import org.ton.utils.MyLocalTonUtils;
 import org.ton.wallet.MyWallet;
 import org.ton.wallet.WalletAddress;
 
-import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Paths;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.util.List;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
+import com.google.gson.GsonBuilder;
+import com.jfoenix.controls.JFXListView;
 
-import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
-import static org.apache.commons.lang3.ObjectUtils.isNotEmpty;
-import static org.ton.main.App.fxmlLoader;
-import static org.ton.main.App.mainController;
-import static org.ton.ui.custom.events.CustomEventBus.emit;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.util.Duration;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Getter
@@ -334,24 +343,8 @@ public class MyLocalTon {
         validatorProcess.destroy();
     }
 
-    public WalletEntity createWalletWithFundsAndSmartContract(Node fromNode, WalletVersion walletVersion, long workchain, long subWalletId, BigInteger amount) throws Exception {
+    private void fundAndInitWalletContract(WalletEntity walletEntity, BigInteger amount) throws Exception {
         MyWallet myWallet = new MyWallet();
-
-
-        WalletAddress walletAddress = myWallet.createWalletByVersion(walletVersion, workchain, subWalletId);
-
-        WalletEntity walletEntity = WalletEntity.builder()
-                .wc(walletAddress.getWc())
-                .hexAddress(walletAddress.getHexWalletAddress().toUpperCase())
-                .walletVersion(walletVersion)
-                .wallet(walletAddress)
-                .accountState(RawAccountState.builder().build())
-                .createdAt(Instant.now().getEpochSecond())
-                .build();
-
-        App.dbPool.insertWallet(walletEntity);
-
-        // TOP UP NEW WALLET
 
         WalletAddress fromMasterWalletAddress = WalletAddress.builder()
                 .fullWalletAddress(settings.getMainWalletAddrFull())
@@ -366,7 +359,7 @@ public class MyLocalTon {
                 .fromWallet(fromMasterWalletAddress)
                 .fromWalletVersion(WalletVersion.master) // master
                 .fromSubWalletId(-1L)
-                .destAddr(walletAddress.getNonBounceableAddressBase64Url())
+                .destAddr(walletEntity.getWallet().getNonBounceableAddressBase64Url())
                 .amount(amount)
                 .build();
 
@@ -374,19 +367,18 @@ public class MyLocalTon {
 
         if (sentOK) {
             Thread.sleep(2000);
-            myWallet.installWalletSmartContract(fromNode, walletAddress);
+            myWallet.installWalletSmartContract(settings.getGenesisNode(), walletEntity.getWallet());
         } else {
-            App.mainController.showErrorMsg(String.format("Failed to send %s Toncoins to %s", amount, walletAddress.getNonBounceableAddressBase64Url()), 5);
+            App.mainController.showErrorMsg(String.format("Failed to send %s Toncoins to %s", amount, walletEntity.getWallet().getNonBounceableAddressBase64Url()), 5);
         }
-
-        return walletEntity;
     }
 
     public void createInitialWallets(Node genesisNode) throws Exception {
 
         long installed = App.dbPool.getNumberOfWalletsFromAllDBsAsync();
+        long toBeInstalled = 3;
 
-        if (installed < 3) {
+        if (installed < toBeInstalled) {
             Thread.sleep(1000);
             if (!GraphicsEnvironment.isHeadless()) {
                 mainController.showInfoMsg("Creating initial wallets...", 6);
@@ -396,58 +388,111 @@ public class MyLocalTon {
         }
 
         if (App.dbPool.existsMainWallet() == 0) {
-            createWalletSynchronously(genesisNode, getSettings().getGenesisNode().getTonBinDir() + ZEROSTATE + File.separator + "main-wallet", WalletVersion.master, -1L, -1L, settings.getWalletSettings().getInitialAmount(), false); //WC -1
+            createWalletEntityFromZeroState(genesisNode, "main-wallet");
         }
 
         if (App.dbPool.existsConfigWallet() == 0) {
-            createWalletSynchronously(genesisNode, getSettings().getGenesisNode().getTonBinDir() + ZEROSTATE + File.separator + "config-master", WalletVersion.config, -1L, -1L, settings.getWalletSettings().getInitialAmount(), false); //WC -1
+            createWalletEntityFromZeroState(genesisNode, "config-master");
         }
 
         if (isNull(genesisNode.getWalletAddress())) {
             log.info("Creating validator controlling smart-contract for node {}", genesisNode.getNodeName());
-            createWalletSynchronously(genesisNode, null, WalletVersion.V3R2, -1L, settings.getWalletSettings().getDefaultSubWalletId(), genesisNode.getInitialValidatorWalletAmount(), true);
+            WalletAddress genesisWalletAddress = createWalletAddress(WalletVersion.V3R2, -1L, settings.getWalletSettings().getDefaultSubWalletId());
+            createWalletEntity(WalletVersion.V3R2, genesisWalletAddress, genesisNode.getInitialValidatorWalletAmount());
+            genesisNode.setWalletAddress(genesisWalletAddress);
         }
 
-        while (installed < 3) {
+        if (nonNull(settings.getUserWalletMnemonic())) {
+            toBeInstalled++;
+            WalletAddress userWalletAddress = createWalletAddress(
+                WalletVersion.V3R2,
+                settings.getWalletSettings().getDefaultWorkChain(),
+                settings.getWalletSettings().getDefaultSubWalletId(),
+                Arrays.asList(settings.getUserWalletMnemonic().split(" "))
+            );
+
+            if (walletEntityExists(userWalletAddress)) {
+                log.info("Skip user wallet creation, already exists at {}", userWalletAddress.getFullWalletAddress());
+            } else {
+                log.info("Creating user wallet at {}", userWalletAddress.getFullWalletAddress());
+                createWalletEntity(WalletVersion.V3R2, userWalletAddress, settings.getWalletSettings().getInitialAmount());
+            }
+        } else {
+            log.info("Skip user wallet creation, no mnemonic provided");
+        }
+
+        while (installed < toBeInstalled) {
             installed = App.dbPool.getNumberOfWalletsFromAllDBsAsync();
             Thread.sleep(200);
             log.info("creating main validator wallet, total wallets {}", installed);
         }
     }
 
-    public void createWalletAsynchronously(Node node, String fileBaseName, WalletVersion walletVersion, long workchain, long subWalletid, BigInteger amount, boolean validatorWallet) {
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-
-        executorService.execute(() -> {
-            log.info("CreateWalletEntity thread started!");
-            Thread.currentThread().setName("MyLocalTon - Creating wallet - " + walletVersion.getValue() + ",wc=" + workchain + ",walledId=" + subWalletid);
-
-            createWalletEntity(node, fileBaseName, walletVersion, workchain, subWalletid, amount, validatorWallet);
-        });
-
-        executorService.shutdown();
+    public WalletAddress createWalletAddress(WalletVersion walletVersion, long workchain, long subWalletid) throws Exception {
+        return createWalletAddress(walletVersion, workchain, subWalletid, null);
     }
 
-    public void createWalletSynchronously(Node node, String fileBaseName, WalletVersion walletVersion, long workchain, long subWalletid, BigInteger amount, boolean validatorWallet) {
-        createWalletEntity(node, fileBaseName, walletVersion, workchain, subWalletid, amount, validatorWallet);
+    public WalletAddress createWalletAddress(WalletVersion walletVersion, long workchain, long subWalletid, List<String> mnemonic) throws Exception {
+        MyWallet myWallet = new MyWallet();
+        return myWallet.createWallet(
+            walletVersion,
+            workchain,
+            subWalletid,
+            mnemonic
+        );
     }
 
-    public void createWalletEntity(Node node, String fileBaseName, WalletVersion walletVersion, long workchain, long subWalletid, BigInteger amount, boolean validatorWallet) {
+    private boolean walletEntityExists(WalletAddress walletAddress) {
+        WalletPk walletPk = WalletPk.builder()
+            .wc(walletAddress.getWc())
+            .hexAddress(walletAddress.getHexWalletAddress().toUpperCase())
+            .build();
+        WalletEntity walletEntity = App.dbPool.findWallet(walletPk);
+
+        return nonNull(walletEntity);
+    }
+
+    public void createWalletEntity(WalletVersion walletVersion, long workchain, long subWalletid, BigInteger amount) {
+        WalletAddress walletAddress;
         try {
-            WalletEntity wallet;
-            if (isNull(fileBaseName)) {
-                wallet = createWalletWithFundsAndSmartContract(settings.getGenesisNode(), walletVersion, workchain, subWalletid, amount);
-                log.debug("created wallet address {}", wallet.getHexAddress());
-            } else { //read address of initially created wallet (main-wallet and config-master)
-                wallet = new Fift().getWalletByBasename(node, fileBaseName);
-                log.debug("read wallet address: {}", wallet.getHexAddress());
-            }
+            walletAddress = createWalletAddress(walletVersion, workchain, subWalletid);
+        } catch (Exception e) {
+            log.error("Error creating wallet address! Error {} ", e.getMessage());
+            log.error(ExceptionUtils.getStackTrace(e));
+            return;
+        }
 
-            if (validatorWallet) {
-                node.setWalletAddress(wallet.getWallet());
-            }
+        createWalletEntity(walletVersion, walletAddress, amount);
+    }
+
+    public void createWalletEntity(WalletVersion walletVersion, WalletAddress walletAddress, BigInteger amount) {
+        try {
+            WalletEntity walletEntity = WalletEntity.builder()
+                    .wc(walletAddress.getWc())
+                    .hexAddress(walletAddress.getHexWalletAddress().toUpperCase())
+                    .walletVersion(walletVersion)
+                    .wallet(walletAddress)
+                    .accountState(RawAccountState.builder().build())
+                    .createdAt(Instant.now().getEpochSecond())
+                    .build();
+            
+            App.dbPool.insertWallet(walletEntity);
+            fundAndInitWalletContract(walletEntity, amount);
         } catch (Exception e) {
             log.error("Error creating wallet! Error {} ", e.getMessage());
+            log.error(ExceptionUtils.getStackTrace(e));
+        }
+    }
+
+    public void createWalletEntityFromZeroState(Node node, String zeroStateName) {
+        try {
+            WalletEntity wallet = new Fift().getWalletByBasename(
+                node,
+                getSettings().getGenesisNode().getTonBinDir() + ZEROSTATE + File.separator + zeroStateName
+            );
+            log.debug("read wallet address: {}", wallet.getHexAddress());
+        } catch (Exception e) {
+            log.error("Error creating wallet from zerostate file! Error {} ", e.getMessage());
             log.error(ExceptionUtils.getStackTrace(e));
         }
     }

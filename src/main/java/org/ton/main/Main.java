@@ -1,21 +1,22 @@
 package org.ton.main;
 
-import com.google.common.net.InetAddresses;
-import lombok.extern.slf4j.Slf4j;
+import java.awt.GraphicsEnvironment;
+import java.io.File;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
+import java.util.Arrays;
+import static java.util.Objects.nonNull;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.ton.actions.MyLocalTon;
 import org.ton.settings.MyLocalTonSettings;
 import org.ton.utils.MyLocalTonUtils;
 
-import java.awt.*;
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileLock;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.google.common.net.InetAddresses;
 
-import static java.util.Objects.nonNull;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class Main {
@@ -73,6 +74,9 @@ public class Main {
         if (GraphicsEnvironment.isHeadless()) {
             log.info("You are using headless version of Java. GUI will not be available.");
         }
+
+        // If mnemonic property is provided, a funded wallet will be created on startup
+        settings.setUserWalletMnemonic(System.getProperty("mnemonic"));
 
         System.setProperty("objectdb.home", MyLocalTonSettings.DB_DIR);
         System.setProperty("objectdb.conf", MyLocalTonSettings.DB_SETTINGS_FILE);

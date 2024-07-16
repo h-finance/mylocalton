@@ -1,12 +1,5 @@
 package org.ton.settings;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.SystemUtils;
-import org.ton.parameters.ValidationParam;
-
 import java.io.File;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -16,6 +9,14 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
+
+import org.apache.commons.lang3.SystemUtils;
+import org.ton.parameters.ValidationParam;
+
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
 @Getter
 @Setter
@@ -83,6 +84,8 @@ public class MyLocalTonSettings implements Serializable {
     String mainWalletPrvKey;
     String mainWalletFilenameBaseLocation;
 
+    String userWalletMnemonic;
+
     String electorSmcAddrBase64;
     String electorSmcAddrHex;
 
@@ -127,7 +130,7 @@ public class MyLocalTonSettings implements Serializable {
         BigInteger initialAmount = new BigInteger("778000000000");
         //        WalletVersion walletVersion = WalletVersion.V3R2;
         Long defaultWorkChain = 0L;
-        long defaultSubWalletId = 42L;
+        long defaultSubWalletId = 698983191L;
     }
 
     //options - UI

@@ -1,8 +1,22 @@
 package org.ton.ui.custom.layout;
 
+import java.net.URL;
+import java.util.ResourceBundle;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.ton.actions.MyLocalTon;
+import org.ton.java.smartcontract.types.WalletVersion;
+import org.ton.ui.custom.events.CustomEvent;
+import static org.ton.ui.custom.events.CustomEventBus.emit;
+import org.ton.ui.custom.events.event.CustomActionEvent;
+import org.ton.ui.custom.events.event.CustomNotificationEvent;
+
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXComboBox;
 import com.jfoenix.controls.JFXTextField;
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.EventHandler;
@@ -11,19 +25,6 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.AnchorPane;
-import org.apache.commons.lang3.StringUtils;
-import org.ton.actions.MyLocalTon;
-import org.ton.java.smartcontract.types.WalletVersion;
-import org.ton.ui.custom.events.CustomEvent;
-import org.ton.ui.custom.events.event.CustomActionEvent;
-import org.ton.ui.custom.events.event.CustomNotificationEvent;
-
-import java.net.URL;
-import java.util.ResourceBundle;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static org.ton.ui.custom.events.CustomEventBus.emit;
 
 public class AccountsCreatePaneController implements Initializable {
 
@@ -88,13 +89,11 @@ public class AccountsCreatePaneController implements Initializable {
                 WalletVersion walletVersion = WalletVersion.getKeyByValue(newWalletVersion.getValue());
 
                 MyLocalTon.getInstance().createWalletEntity(
-                        MyLocalTon.getInstance().getSettings().getGenesisNode(),
-                        null,
-                        walletVersion,
-                        chain,
-                        walletId,
-                        MyLocalTon.getInstance().getSettings().getWalletSettings().getInitialAmount(),
-                        false);
+                    walletVersion,
+                    chain,
+                    walletId,
+                    MyLocalTon.getInstance().getSettings().getWalletSettings().getInitialAmount()
+                );
 
 
             } catch (Exception e) {

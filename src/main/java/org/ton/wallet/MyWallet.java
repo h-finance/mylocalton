@@ -1,11 +1,16 @@
 package org.ton.wallet;
 
-import com.iwebpp.crypto.TweetNaclFast;
-import lombok.extern.slf4j.Slf4j;
+import java.io.File;
+import java.math.BigDecimal;
+import java.util.List;
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
+
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import static org.ton.actions.MyLocalTon.tonlib;
 import org.ton.enums.LiteClientEnum;
 import org.ton.executors.fift.Fift;
 import org.ton.executors.liteclient.LiteClient;
@@ -30,13 +35,9 @@ import org.ton.java.utils.Utils;
 import org.ton.parameters.SendToncoinsParam;
 import org.ton.settings.Node;
 
-import java.io.File;
-import java.math.BigDecimal;
-import java.util.List;
+import com.iwebpp.crypto.TweetNaclFast;
 
-import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
-import static org.ton.actions.MyLocalTon.tonlib;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class MyWallet {
@@ -237,9 +238,8 @@ public class MyWallet {
         }
     }
 
-    public WalletAddress createWalletByVersion(WalletVersion walletVersion, long workchainId, long walletId) throws Exception {
-
-        List<String> mnemonic = Mnemonic.generate(24, "");
+    public WalletAddress createWallet(WalletVersion walletVersion, long workchainId, long walletId, List<String> mnemonic) throws Exception {
+        mnemonic = isNull(mnemonic) ? Mnemonic.generate(24, "") : mnemonic;
         org.ton.java.mnemonic.Pair keyPair = Mnemonic.toKeyPair(mnemonic, "");
 
         TweetNaclFast.Signature.KeyPair keyPairSig = TweetNaclFast.Signature.keyPair_fromSeed(keyPair.getSecretKey());
@@ -275,5 +275,9 @@ public class MyWallet {
                 .privateKeyHex(Hex.encodeHexString(keyPair.getSecretKey()))
                 .publicKeyHex(Hex.encodeHexString(keyPair.getPublicKey()))
                 .build();
+    }
+
+    public WalletAddress createWallet(WalletVersion walletVersion, long workchainId, long walletId) throws Exception {
+        return createWallet(walletVersion, workchainId, walletId, null);
     }
 }
